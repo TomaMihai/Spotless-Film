@@ -70,3 +70,45 @@ CLAUDE.md
 
 !docs/app-img.jpg
 !docs/app-preview.png
+
+# --- GitHub Copilot & Copilot Workspaces ---
+# Common Copilot workspace/meta files
+.copilot/
+.copilot/**
+.copilot-workspace/
+.copilot-workspace/**
+
+# Copilot-generated docs/summaries
+copilot*.md
+COPILOT*.md
+README.copilot.md
+COPILOT_WORKSPACE*
+COPILOTWORKSPACESUMMARY*
+
+# Copilot configs inside .github (if any)
+.github/copilot*
+.github/copilot/**
+.github/workflows/copilot*.yml
+
+# Copilot snapshots
+copilotsnapshots
+copilotsnapshots/
+.copilotsnapshots/
+.copilotsnapshots/**
+
+# Copilot chat and indices
+copilot-chat
+copilot-chat/**
+.copilot-chat/
+.copilot-chat/**
+copilotindices
+copilotindices/**
+.copilotindices/
+.copilotindices/**
+filecontentindex
+filecontentindex/**
+.filecontentindex/
+.filecontentindex/**
+
+# Visual Studio
+.vs/

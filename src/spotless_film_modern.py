@@ -22,6 +22,22 @@ from typing import Optional, List, Tuple
 # Add current directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
+# ---------------------------------------------------------------------------
+# HuggingFace hub compatibility shim: newer versions removed cached_download.
+# Some third-party dependencies (e.g. lama-cleaner) still import cached_download.
+# Provide a fallback using hf_hub_download to prevent ImportError.
+# ---------------------------------------------------------------------------
+try:
+    import huggingface_hub as _hf
+    if not hasattr(_hf, "cached_download"):
+        from huggingface_hub import hf_hub_download as _hf_hub_download
+        def cached_download(*args, **kwargs):  # type: ignore
+            return _hf_hub_download(*args, **kwargs)
+        _hf.cached_download = cached_download  # type: ignore
+except Exception:
+    # If huggingface_hub itself is missing we leave it; later code will handle model availability.
+    pass
+
 from dust_removal_state import DustRemovalState, ProcessingMode, ToolMode
 from ui_components import SpotlessSidebar, SpotlessToolbar, ZoomControls
 from professional_canvas import SpotlessCanvas
@@ -239,7 +255,8 @@ class SpotlessFilmModern:
         sensitivity_label = ctk.CTkLabel(header_row, text="🎯 Sensitivity",
                                         font=ctk.CTkFont(size=12, weight="bold"))
         sensitivity_label.pack(side="left")
-        self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{self.state.processing_state.threshold:.3f}",
+        # Show 4 decimal places for very low thresholds
+        self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{self.state.processing_state.threshold:.4f}",
                                                  font=ctk.CTkFont(size=11), text_color="#CCCCCC")
         self.threshold_value_label.pack(side="right")
 
@@ -250,22 +267,22 @@ class SpotlessFilmModern:
         # Labels for slider
         labels_frame = ctk.CTkFrame(slider_frame, fg_color="transparent")
         labels_frame.pack(fill="x")
-        less_label = ctk.CTkLabel(labels_frame, text="Less Sensitive",
+        less_label = ctk.CTkLabel(labels_frame, text="More Sensitive",
                                  font=ctk.CTkFont(size=9), text_color="#888888")
         less_label.pack(side="left")
-        more_label = ctk.CTkLabel(labels_frame, text="More Sensitive",
+        more_label = ctk.CTkLabel(labels_frame, text="Less Sensitive",
                                  font=ctk.CTkFont(size=9), text_color="#888888")
         more_label.pack(side="right")
 
-        # Slider
-        self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.001, to=0.05,
+        # Slider (extended lower bound and finer steps)
+        self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.0001, to=0.075,
                                              command=self.on_threshold_changed,
-                                             number_of_steps=50)
+                                             number_of_steps=200)
         self.threshold_slider.set(float(self.state.processing_state.threshold))
         self.threshold_slider.pack(fill="x", pady=(5, 0))
 
         # Helper text
-        help_label = ctk.CTkLabel(self.threshold_frame, text="Adjust to fine-tune dust detection",
+        help_label = ctk.CTkLabel(self.threshold_frame, text="Lower values detect only strongest dust; raise for more.",
                                  font=ctk.CTkFont(size=9), text_color="#666666")
         help_label.pack(anchor="w", pady=(5, 0))
     
@@ -1509,7 +1526,6 @@ class SpotlessFilmModern:
         self.processing_task.daemon = True
         
         self.processing_task.start()
-    
     def remove_dust(self):
         """Remove dust using AI inpainting"""
         print(f"🎯 Remove dust called - can_remove_dust: {self.state.can_remove_dust}")
@@ -1828,7 +1844,8 @@ class SpotlessFilmModern:
         """Cycle through compare modes"""
         modes = [ProcessingMode.SINGLE, ProcessingMode.SIDE_BY_SIDE, ProcessingMode.SPLIT_SLIDER]
         current_index = modes.index(self.state.view_state.processing_mode)
-        next_mode = modes[(current_index + 1) % len(modes)]
+        next_index = (current_index + 1) % len(modes)
+        next_mode = modes[next_index]
         self.state.set_processing_mode(next_mode)
     
     def undo_mask_change(self):
@@ -1837,11 +1854,11 @@ class SpotlessFilmModern:
             self.state.undo_last_mask_change()
     
     def on_threshold_changed(self, value):
-        """Handle real-time threshold slider changes (matches Swift app)"""
+        """Handle real-time threshold slider changes (matches Swift app behavior)"""
         threshold = float(value)
         
         # Update the displayed value
-        self.threshold_value_label.configure(text=f"{threshold:.3f}")
+        self.threshold_value_label.configure(text=f"{threshold:.4f}")
         
         # Update the state threshold
         self.state.processing_state.threshold = threshold
