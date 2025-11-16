@@ -84,6 +84,10 @@ class SpotlessFilmModern:
         self.lama_inpainter: Optional[LamaInpainter] = None
         self.processing_task: Optional[ProcessingTask] = None
         
+        # Flags
+        self._importing = False
+        self._batch_running = False
+        
         # Callback dictionary for UI components
         self.callbacks = {
             'import_image': self.import_image,
@@ -233,7 +237,14 @@ class SpotlessFilmModern:
                                        height=32, fg_color="#4A4A4A",
                                        hover_color="#5A5A5A")
         self.import_btn.pack(fill="x", pady=(0, 5))
-        self._importing = False
+
+        # Batch Process Folder button
+        self.batch_btn = ctk.CTkButton(parent, text="📂 Batch Process Folder",
+                                       command=self.batch_process_folder_dialog,
+                                       font=ctk.CTkFont(size=12),
+                                       height=32, fg_color="#4A4A4A",
+                                       hover_color="#5A5A5A")
+        self.batch_btn.pack(fill="x", pady=(0, 5))
     
     def create_detection_section(self, parent):
         """Create detection section content matching macOS design"""
@@ -308,6 +319,141 @@ class SpotlessFilmModern:
                                                  font=ctk.CTkFont(size=12), text_color="#CCCCCC")
         self.processing_time_label.pack(anchor="w")
     
+    # --- Batch Processing APIs ---
+    def _show_messagebox_async(self, kind: str, title: str, msg: str):
+        def _do():
+            try:
+                if kind == 'error':
+                    messagebox.showerror(title, msg)
+                elif kind == 'info':
+                    messagebox.showinfo(title, msg)
+                else:
+                    messagebox.showwarning(title, msg)
+            except Exception:
+                pass
+        self.root.after_idle(_do)
+
+    def _update_status_async(self, text: str, color: Optional[str] = None):
+        def _do():
+            try:
+                if color is not None:
+                    self.status_label.configure(text=text, text_color=color)
+                else:
+                    self.status_label.configure(text=text)
+            except Exception:
+                pass
+        self.root.after_idle(_do)
+
+    def _finish_batch_ui(self):
+        def _do():
+            try:
+                self.batch_btn.configure(text="📂 Batch Process Folder", state="normal")
+            except Exception:
+                pass
+            self._batch_running = False
+        self.root.after_idle(_do)
+
+    def batch_process_folder_dialog(self):
+        """Open a folder picker and start recursive batch processing in background."""
+        if self._batch_running:
+            return
+        folder = filedialog.askdirectory(title="Select Folder to Batch Process")
+        if not folder:
+            return
+        self._batch_running = True
+        try:
+            self.batch_btn.configure(text="📂 Processing...", state="disabled")
+        except Exception:
+            pass
+        t = threading.Thread(target=self._batch_process_folder_worker, args=(folder,))
+        t.daemon = True
+        t.start()
+
+    def _batch_process_folder_worker(self, root_folder: str):
+        try:
+            # Ensure model is available
+            if not self.state.unet_model:
+                self._update_status_async("Model not loaded. Please wait for models to load.", "red")
+                self._show_messagebox_async('error', 'Batch Error', 'U-Net model not loaded. Please wait for models to load.')
+                return
+
+            supported_ext = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")
+            files: List[str] = []
+            for dirpath, _dirnames, filenames in os.walk(root_folder):
+                for fname in filenames:
+                    if fname.lower().endswith(supported_ext):
+                        files.append(os.path.join(dirpath, fname))
+
+            total = len(files)
+            if total == 0:
+                self._update_status_async("No images found in selected folder.")
+                return
+
+            self._update_status_async(f"Batch start: {total} images", "#4CAF50")
+
+            processed = 0
+            failed = 0
+            start = time.time()
+            batch_threshold = 0.075  # fixed sensitivity per request
+
+            for idx, fpath in enumerate(files, start=1):
+                try:
+                    base_no_ext, ext = os.path.splitext(fpath)
+                    # Skip already-processed outputs (ending with 'C')
+                    if base_no_ext.endswith('C'):
+                        continue
+
+                    self._update_status_async(f"[{idx}/{total}] Processing {os.path.basename(fpath)}...")
+
+                    # Load image
+                    with Image.open(fpath) as im:
+                        img = im.convert('RGB')
+
+                    # Predict mask probabilities (tile-based)
+                    prob_mask = ImageProcessingService.predict_dust_mask(
+                        self.state.unet_model,
+                        img,
+                        threshold=0.5,
+                        window_size=1024,
+                        stride=512,
+                        device=self.state.device,
+                        progress_callback=None
+                    )
+
+                    # Threshold to binary at desired sensitivity
+                    bin_mask = ImageProcessingService.create_binary_mask(prob_mask, batch_threshold, img.size)
+
+                    # Dilate for coverage
+                    dilated = ImageProcessingService.dilate_mask(bin_mask)
+
+                    # Inpaint (fast CV2) and blend
+                    inpainted = self.perform_cv2_inpainting(img, dilated)
+                    final_img = ImageProcessingService.blend_images(img, inpainted, dilated)
+
+                    # Output path with 'C' suffix
+                    out_path = base_no_ext + 'C' + ext
+                    if ext.lower() in (".jpg", ".jpeg"):
+                        final_img.save(out_path, 'JPEG', quality=95)
+                    else:
+                        final_img.save(out_path)
+
+                    processed += 1
+                except Exception as e:
+                    failed += 1
+                    print(f"Batch error on {fpath}: {e}")
+
+            elapsed = time.time() - start
+            self._update_status_async(
+                f"Batch done: {processed}/{total} succeeded, {failed} failed in {elapsed:.1f}s",
+                "#4CAF50" if failed == 0 else "orange"
+            )
+            self._show_messagebox_async('info', 'Batch Complete', f"Processed {processed}/{total} images. Failed: {failed}.")
+        except Exception as e:
+            print(f"Batch fatal error: {e}")
+            self._update_status_async(f"Batch failed: {e}", "red")
+        finally:
+            self._finish_batch_ui()
+
     def setup_center_panel(self):
         """Setup the center panel with toolbar and professional canvas"""
         # Center frame
@@ -719,7 +865,7 @@ class SpotlessFilmModern:
                     center_x = canvas_w // 2 + int(self.state.view_state.drag_offset[0])
                     center_y = canvas_h // 2 + int(self.state.view_state.drag_offset[1])
                     self.canvas.coords(self.image_item_id, center_x, center_y)
-                    if self.overlay_item_id is not None:
+                    if selfOverlay_item_id is not None:
                         self.canvas.coords(self.overlay_item_id, center_x, center_y)
             return
 
@@ -1714,8 +1860,8 @@ class SpotlessFilmModern:
                     
             except Exception as e:
                 self.state.show_error(f"Failed to save image: {str(e)}")
-    
-    # MARK: - UI Interaction Methods
+
+                 # MARK: - UI Interaction Methods
     
     def set_view_mode(self, mode: ProcessingMode):
         """Set processing mode and update display"""
@@ -1909,8 +2055,6 @@ class SpotlessFilmModern:
                 
             except Exception as e:
                 print(f"❌ Error loading models: {e}")
-                import traceback
-                traceback.print_exc()
                 self.root.after_idle(lambda: self.status_label.configure(
                     text="Model loading failed", text_color="red"
                 ))
@@ -2132,8 +2276,8 @@ class SpotlessFilmModern:
             return None
         
         return (low_res_x, low_res_y)
-    
-    # MARK: - Brush Cursor Methods
+
+         # MARK: - Brush Cursor Methods
     
     def on_mouse_motion(self, event):
         """Handle mouse motion for brush cursor"""
@@ -2232,6 +2376,7 @@ class SpotlessFilmModern:
                     pass
                 self.hide_brush_cursor()
 
+    
     # MARK: - Application Lifecycle
     
     def run(self):
