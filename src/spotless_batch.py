@@ -7,6 +7,8 @@ import time
 from PIL import Image
 import numpy as np
 
+from image_processing import ImageProcessingService
+
 def _show_messagebox_async(self, kind: str, title: str, msg: str):
     def _do():
         try:
@@ -97,7 +99,7 @@ def _batch_process_folder_worker(self, root_folder: str):
                     img = im.convert('RGB')
 
                 # Predict mask probabilities (tile-based)
-                prob_mask = self.ImageProcessingService.predict_dust_mask(
+                prob_mask = ImageProcessingService.predict_dust_mask(
                     self.state.unet_model,
                     img,
                     threshold=0.5,
@@ -108,14 +110,14 @@ def _batch_process_folder_worker(self, root_folder: str):
                 )
 
                 # Threshold to binary at desired sensitivity
-                bin_mask = self.ImageProcessingService.create_binary_mask(prob_mask, batch_threshold, img.size)
+                bin_mask = ImageProcessingService.create_binary_mask(prob_mask, batch_threshold, img.size)
 
                 # Dilate for coverage
-                dilated = self.ImageProcessingService.dilate_mask(bin_mask)
+                dilated = ImageProcessingService.dilate_mask(bin_mask)
 
                 # Inpaint (fast CV2) and blend
                 inpainted = self.perform_cv2_inpainting(img, dilated)
-                final_img = self.ImageProcessingService.blend_images(img, inpainted, dilated)
+                final_img = ImageProcessingService.blend_images(img, inpainted, dilated)
 
                 # Output path with 'C' suffix
                 out_path = base_no_ext + 'C' + ext
