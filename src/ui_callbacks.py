@@ -166,7 +166,7 @@ def toggle_dust_overlay(app):
     if app.state.dust_mask:
         hide_detections = getattr(app.state, 'hide_detections', False)
         app.state.hide_detections = not hide_detections
-        print(f"🎭 Dust overlay: {'hidden' if app.state.hide_detections else 'visible'}")
+        print(f"🎭 Dust overlay: {{'hidden' if app.state.hide_detections else 'visible'}}")
         # Refresh display
         if app.state.selected_image:
             app.display_image()
@@ -221,4 +221,3 @@ def set_view_mode(app, mode: ProcessingMode):
     app.update_view_buttons()
     # Force immediate display update
     app.display_image()
-

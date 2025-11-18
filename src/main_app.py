@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Spotless Film - Modern Professional Version
@@ -10,8 +9,8 @@ import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD
 from pathlib import Path
 import sys
-from PIL import Image
 from typing import Optional, List, Tuple
+from PIL import Image
 
 # Add current directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))

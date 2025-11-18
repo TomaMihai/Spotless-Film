@@ -1,11 +1,10 @@
-
-from PIL import Image
 import time
 import threading
 import numpy as np
 from PIL import Image
 from image_processing import ImageProcessingService, ProcessingTask
 from dust_removal_state import ToolMode, ProcessingMode
+import gc
 
 def detect_dust(app):
     """Detect dust in the selected image"""
@@ -193,15 +192,6 @@ def remove_dust(app):
     
     app.processing_task.start()
     print("🎯 ProcessingTask started")
-
-import gc
-from PIL import Image
-import time
-import threading
-import numpy as np
-from PIL import Image
-from image_processing import ImageProcessingService, ProcessingTask
-from dust_removal_state import ToolMode, ProcessingMode
 
 def perform_dust_removal(app) -> Image.Image:
     """Perform the actual dust removal process using CV2 inpainting"""

@@ -1,4 +1,3 @@
-
 import threading
 from pathlib import Path
 from image_processing import ImageProcessingService, LamaInpainter
