@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 from typing import Optional, List, Tuple
 from PIL import Image
+import threading
 
 # Add current directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -265,12 +266,12 @@ class SpotlessFilmModern:
         spotless_batch._show_messagebox_async(self, kind, title, msg)
     def _update_status_async(self, text: str, color: Optional[str] = None):
         spotless_batch._update_status_async(self, text, color)
-    def _finish_batch_ui(self):
-        spotless_batch._finish_batch_ui(self)
+    def _finish_batch_ui(self, progress_window=None):
+        spotless_batch._finish_batch_ui(self, progress_window)
     def batch_process_folder_dialog(self):
         spotless_batch.batch_process_folder_dialog(self)
-    def _batch_process_folder_worker(self, root_folder: str):
-        spotless_batch._batch_process_folder_worker(self, root_folder)
+    def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_event: threading.Event):
+        spotless_batch._batch_process_folder_worker(self, root_folder, progress_window, stop_event)
 
     def run(self):
         """Run the application"""
