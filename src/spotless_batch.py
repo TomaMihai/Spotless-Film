@@ -253,6 +253,10 @@ def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_e
                 if not getattr(self.state, 'remove_scratches', True):
                     bin_mask = ImageProcessingService.keep_small_dust_only(bin_mask)
 
+                if getattr(self.state, 'dust_brightness_color', True):
+                    bin_mask = ImageProcessingService.filter_mask_by_brightness_and_color(
+                        bin_mask, img, min_brightness=getattr(self.state,'min_brightness',180), max_color_diff=getattr(self.state,'max_color_diff',40))
+
                 # Dilate for coverage
                 dilated = ImageProcessingService.dilate_mask(bin_mask)
 

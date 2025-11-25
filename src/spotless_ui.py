@@ -82,7 +82,7 @@ def create_import_section(self, parent):
     header_row.pack(fill="x")
     batch_sens_label = ctk.CTkLabel(header_row, text="Batch Sensitivity", font=ctk.CTkFont(size=11, weight="bold"))
     batch_sens_label.pack(side="left")
-    self.batch_threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state, 'batch_threshold', 0.2):.4f}", font=ctk.CTkFont(size=10), text_color="#CCCCCC")
+    self.batch_threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state, 'batch_threshold', 0.4):.4f}", font=ctk.CTkFont(size=10), text_color="#CCCCCC")
     self.batch_threshold_value_label.pack(side="right")
     slider_frame = ctk.CTkFrame(batch_sens_frame, fg_color="transparent")
     slider_frame.pack(fill="x")
@@ -91,15 +91,15 @@ def create_import_section(self, parent):
     more_label = ctk.CTkLabel(slider_frame, text="Less Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
     more_label.pack(side="right")
     self.batch_threshold_slider = ctk.CTkSlider(
-        slider_frame, from_=0.0001, to=0.2, number_of_steps=200,
+        slider_frame, from_=0.0001, to=0.5, number_of_steps=200,
         command=self.on_batch_threshold_changed
     )
-    self.batch_threshold_slider.set(getattr(self.state, 'batch_threshold', 0.0750))
+    self.batch_threshold_slider.set(getattr(self.state, 'batch_threshold', 0.4))
     self.batch_threshold_slider.pack(fill="x", pady=(5, 0))
 
 def create_removal_section(self, parent):
     # Checkbox to control scratch/lint removal
-    self.remove_scratches_var = ctk.BooleanVar(value=getattr(self.state, 'remove_scratches', True))
+    self.remove_scratches_var = ctk.BooleanVar(value=getattr(self.state, 'remove_scratches', False))
     def on_remove_scratches_toggled():
         self.state.remove_scratches = bool(self.remove_scratches_var.get())
         # Rebuild dust mask if prediction already exists
@@ -113,6 +113,65 @@ def create_removal_section(self, parent):
         command=on_remove_scratches_toggled
     )
     self.remove_scratches_chk.pack(anchor="w", pady=(0, 8))
+
+    # Checkbox to control color/brightness filtering
+    self.dust_brightness_color_var = ctk.BooleanVar(value=getattr(self.state, 'dust_brightness_color', True))
+    def on_dust_brightness_color_toggled():
+        self.state.dust_brightness_color = bool(self.dust_brightness_color_var.get())
+        if self.state.raw_prediction_mask is not None:
+            from state_and_model_management import update_dust_mask_with_threshold
+            update_dust_mask_with_threshold(self)
+    self.dust_brightness_color_chk = ctk.CTkCheckBox(
+        parent,
+        text="Only clean dust on white/neutral areas (negatives)",
+        variable=self.dust_brightness_color_var,
+        command=on_dust_brightness_color_toggled
+    )
+    self.dust_brightness_color_chk.pack(anchor="w", pady=(0, 2))
+
+    # Sliders for min_brightness and max_color_diff
+    from tkinter import IntVar
+    self.min_brightness_var = IntVar(value=getattr(self.state, 'min_brightness', 5))
+    self.max_color_diff_var = IntVar(value=getattr(self.state, 'max_color_diff', 255))
+    def on_brightness_slider(val):
+        self.state.min_brightness = int(float(val))
+        if self.state.raw_prediction_mask is not None and self.dust_brightness_color_var.get():
+            from state_and_model_management import update_dust_mask_with_threshold
+            update_dust_mask_with_threshold(self)
+        self.min_brightness_value_label.configure(text=f"{self.state.min_brightness}")
+    def on_color_diff_slider(val):
+        self.state.max_color_diff = int(float(val))
+        if self.state.raw_prediction_mask is not None and self.dust_brightness_color_var.get():
+            from state_and_model_management import update_dust_mask_with_threshold
+            update_dust_mask_with_threshold(self)
+        self.max_color_diff_value_label.configure(text=f"{self.state.max_color_diff}")
+    # Brightness slider
+    brightness_frame = ctk.CTkFrame(parent, fg_color="transparent")
+    brightness_frame.pack(fill="x", padx=0, pady=(0, 0))
+    brightness_label = ctk.CTkLabel(brightness_frame, text="Min Brightness", font=ctk.CTkFont(size=9), text_color="#888888")
+    brightness_label.pack(side="left")
+    self.min_brightness_value_label = ctk.CTkLabel(brightness_frame, text=f"{self.min_brightness_var.get()}", font=ctk.CTkFont(size=9), text_color="#CCCCCC")
+    self.min_brightness_value_label.pack(side="right")
+    self.min_brightness_slider = ctk.CTkSlider(
+        brightness_frame, from_=0, to=255, number_of_steps=50,
+        command=on_brightness_slider
+    )
+    self.min_brightness_slider.set(self.min_brightness_var.get())
+    self.min_brightness_slider.pack(fill="x", pady=(0, 2))
+    # Color diff slider
+    color_frame = ctk.CTkFrame(parent, fg_color="transparent")
+    color_frame.pack(fill="x", padx=0, pady=(0, 8))
+    color_label = ctk.CTkLabel(color_frame, text="Max Color Diff", font=ctk.CTkFont(size=9), text_color="#888888")
+    color_label.pack(side="left")
+    self.max_color_diff_value_label = ctk.CTkLabel(color_frame, text=f"{self.max_color_diff_var.get()}", font=ctk.CTkFont(size=9), text_color="#CCCCCC")
+    self.max_color_diff_value_label.pack(side="right")
+    self.max_color_diff_slider = ctk.CTkSlider(
+        color_frame, from_=0, to=255, number_of_steps=50,
+        command=on_color_diff_slider
+    )
+    self.max_color_diff_slider.set(self.max_color_diff_var.get())
+    self.max_color_diff_slider.pack(fill="x", pady=(0, 2))
+
     self.remove_btn = ctk.CTkButton(parent, text="🧹 Remove Dust", command=self.remove_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
     self.remove_btn.pack(fill="x", pady=(0, 10))
     self.processing_time_frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -131,7 +190,7 @@ def create_detection_section(self, parent):
     header_row.pack(fill="x")
     sensitivity_label = ctk.CTkLabel(header_row, text="🎯 Sensitivity", font=ctk.CTkFont(size=12, weight="bold"))
     sensitivity_label.pack(side="left")
-    self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state.processing_state, 'threshold', 0.0750):.4f}", font=ctk.CTkFont(size=11), text_color="#CCCCCC")
+    self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state.processing_state, 'threshold', 0.4):.4f}", font=ctk.CTkFont(size=11), text_color="#CCCCCC")
     self.threshold_value_label.pack(side="right")
     slider_frame = ctk.CTkFrame(self.threshold_frame, fg_color="transparent")
     slider_frame.pack(fill="x", pady=(0, 5))
@@ -141,9 +200,9 @@ def create_detection_section(self, parent):
     less_label.pack(side="left")
     more_label = ctk.CTkLabel(labels_frame, text="Less Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
     more_label.pack(side="right")    
-    self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.0001, to=0.2, command=self.on_threshold_changed, number_of_steps=200)
-    self.threshold_slider.set(getattr(self.state.processing_state, 'threshold', 0.0750))
-    self.threshold_slider.set(getattr(self.state, 'threshold', 0.0750))
+    self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.0001, to=0.5, command=self.on_threshold_changed, number_of_steps=100)
+    self.threshold_slider.set(getattr(self.state.processing_state, 'threshold', 0.4))
+    self.threshold_slider.set(getattr(self.state, 'threshold', 0.4))
     self.threshold_slider.pack(fill="x", pady=(5, 0))
     help_label = ctk.CTkLabel(self.threshold_frame, text="Lower values detect only strongest dust; raise for more.", font=ctk.CTkFont(size=9), text_color="#666666")
     help_label.pack(anchor="w", pady=(5, 0))
@@ -171,9 +230,11 @@ def update_brush_cursor(self, x, y):
     # Get brush size (actual pixel size regardless of zoom)
     brush_size = getattr(self.state.view_state, 'brush_size', 20)
         
-    # Scale brush size by current zoom level to show actual size on image
-    zoom_scale = getattr(self.state.view_state, 'zoom_scale', 1.0)
-    display_size = int(brush_size * zoom_scale)
+    # Scale brush size to be smaller on higher resolutions (e.g. HiDPI displays)
+    if hasattr(self.state.view_state, 'device_pixel_ratio'):
+        display_size = int(brush_size / self.state.view_state.device_pixel_ratio)
+    else:
+        display_size = brush_size
         
     # Ensure minimum visibility (at least 4 pixels) and maximum reasonable size (200 pixels)
     display_size = max(4, min(200, display_size))

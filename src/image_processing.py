@@ -355,6 +355,31 @@ class ImageProcessingService:
         print(f"✅ Images blended successfully")
         return result
 
+    @staticmethod
+    def filter_mask_by_brightness_and_color(mask: Image.Image, original: Image.Image, min_brightness: int = 180, max_color_diff: int = 40) -> Image.Image:
+        """
+        Keep only mask pixels where the original image is above min_brightness (0-255)
+        and is not strongly colored.
+        Color neutrality test now uses the MAX channel difference instead of SUM so a threshold 0..255 is intuitive.
+        If (min_brightness <= 0 and max_color_diff >= 255) we skip filtering (acts as OFF).
+        """
+        # Direct pass-through when filter effectively disabled
+        if min_brightness <= 0 and max_color_diff >= 255:
+            print("🎨 filter_mask_by_brightness_and_color: disabled (passthrough)")
+            return mask
+        mask_np = np.array(mask.convert('L'))
+        orig_np = np.array(original.convert('RGB'))
+        gray = orig_np.mean(axis=2)
+        # Use max difference between any two channels (range 0..255)
+        diff_rg = np.abs(orig_np[:, :, 0] - orig_np[:, :, 1])
+        diff_gb = np.abs(orig_np[:, :, 1] - orig_np[:, :, 2])
+        diff_rb = np.abs(orig_np[:, :, 0] - orig_np[:, :, 2])
+        color_diff = np.maximum.reduce([diff_rg, diff_gb, diff_rb])  # 0..255
+        keep = (gray >= min_brightness) & (color_diff <= max_color_diff)
+        filtered = np.where(keep, mask_np, 0).astype(np.uint8)
+        print(f"🎨 filter_mask_by_brightness_and_color: min_brightness={min_brightness}, max_color_diff={max_color_diff}, before={(mask_np>0).sum()}, after={(filtered>0).sum()}")
+        return Image.fromarray(filtered, mode='L')
+
 
 class BrushTools:
     """Tools for brush and eraser operations on masks"""

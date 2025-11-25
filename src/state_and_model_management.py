@@ -117,7 +117,12 @@ def update_dust_mask_with_threshold(app):
     # If user disabled scratch/lint removal, filter to keep only small dust specks
     if new_mask and not getattr(app.state, 'remove_scratches', True):
         new_mask = ImageProcessingService.keep_small_dust_only(new_mask)
-    
+    # If user enabled color/brightness filtering, apply it
+    if new_mask and getattr(app.state, 'dust_brightness_color', True):
+        min_brightness = getattr(app.state, 'min_brightness', 180)
+        max_color_diff = getattr(app.state, 'max_color_diff', 40)
+        new_mask = ImageProcessingService.filter_mask_by_brightness_and_color(
+            new_mask, app.state.selected_image, min_brightness=min_brightness, max_color_diff=max_color_diff)
     app.state.dust_mask = new_mask
     app.state.create_low_res_mask()
     app.state.notify_observers()
@@ -139,10 +144,15 @@ def update_dust_mask_with_threshold_realtime(app):
     if new_mask:
         if not getattr(app.state, 'remove_scratches', True):
             new_mask = ImageProcessingService.keep_small_dust_only(new_mask)
+        if getattr(app.state, 'dust_brightness_color', True):
+            min_brightness = getattr(app.state, 'min_brightness', 180)
+            max_color_diff = getattr(app.state, 'max_color_diff', 40)
+            new_mask = ImageProcessingService.filter_mask_by_brightness_and_color(
+                new_mask, app.state.selected_image, min_brightness=min_brightness, max_color_diff=max_color_diff)
         app.state.dust_mask = new_mask
         app.state.create_low_res_mask()
         
         # Immediately update the display
         app.update_ui()
         
-        print(f"✅ Mask updated with threshold {app.state.processing_state.threshold:.3f} (filtered small dust only={not getattr(app.state,'remove_scratches', True)})")
+        print(f"✅ Mask updated with threshold {app.state.processing_state.threshold:.3f} (filtered small dust only={not getattr(app.state,'remove_scratches', True)}, color/brightness={getattr(app.state,'dust_brightness_color', True)}, min_brightness={min_brightness}, max_color_diff={max_color_diff})")

@@ -202,11 +202,14 @@ def perform_dust_removal(app) -> Image.Image:
     if not app.state.selected_image or not app.state.dust_mask:
         raise ValueError("Missing required components for dust removal")
     print("🎨 Starting CV2 inpainting process...")
-    # Optionally filter out scratches/lint before dilation
     base_mask = app.state.dust_mask
     if not getattr(app.state, 'remove_scratches', True):
         from image_processing import ImageProcessingService
         base_mask = ImageProcessingService.keep_small_dust_only(base_mask)
+    if getattr(app.state, 'dust_brightness_color', True):
+        from image_processing import ImageProcessingService
+        base_mask = ImageProcessingService.filter_mask_by_brightness_and_color(
+            base_mask, app.state.selected_image, min_brightness=getattr(app.state,'min_brightness',180), max_color_diff=getattr(app.state,'max_color_diff',40))
     print("🎨 Dilating mask...")
     from image_processing import ImageProcessingService
     dilated_mask = ImageProcessingService.dilate_mask(base_mask)
