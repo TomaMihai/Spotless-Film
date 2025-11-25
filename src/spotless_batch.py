@@ -153,6 +153,7 @@ def batch_process_folder_dialog(self):
     
     progress_window = BatchProgressWindow(self.root)
     self.root.attributes('-alpha', 1.0) # Force main window to be opaque
+    progress_window.lift() # Bring the batch window to the front
     
     t = threading.Thread(target=self._batch_process_folder_worker, args=(folder, progress_window, progress_window.stop_event))
     t.daemon = True
