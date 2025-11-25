@@ -219,6 +219,7 @@ def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_e
         
         batch_cancelled = False
 
+        from image_processing import ImageProcessingService
         for idx, fpath in enumerate(files_to_process, start=1):
             if stop_event.is_set():
                 batch_cancelled = True
@@ -248,6 +249,9 @@ def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_e
 
                 # Threshold to binary at desired sensitivity
                 bin_mask = ImageProcessingService.create_binary_mask(prob_mask, batch_threshold, img.size)
+
+                if not getattr(self.state, 'remove_scratches', True):
+                    bin_mask = ImageProcessingService.keep_small_dust_only(bin_mask)
 
                 # Dilate for coverage
                 dilated = ImageProcessingService.dilate_mask(bin_mask)

@@ -199,32 +199,24 @@ def perform_dust_removal(app) -> Image.Image:
     print(f"🎨 perform_dust_removal called")
     print(f"🎨 Selected image available: {app.state.selected_image is not None}")
     print(f"🎨 Dust mask available: {app.state.dust_mask is not None}")
-    
     if not app.state.selected_image or not app.state.dust_mask:
         raise ValueError("Missing required components for dust removal")
-    
     print("🎨 Starting CV2 inpainting process...")
-    
-    # Dilate mask for better coverage
+    # Optionally filter out scratches/lint before dilation
+    base_mask = app.state.dust_mask
+    if not getattr(app.state, 'remove_scratches', True):
+        from image_processing import ImageProcessingService
+        base_mask = ImageProcessingService.keep_small_dust_only(base_mask)
     print("🎨 Dilating mask...")
-    dilated_mask = ImageProcessingService.dilate_mask(app.state.dust_mask)
-    
-    # Convert to RGB for processing
+    from image_processing import ImageProcessingService
+    dilated_mask = ImageProcessingService.dilate_mask(base_mask)
     print("🎨 Converting image to RGB...")
     image_rgb = app.state.selected_image.convert('RGB')
-    
-    # Perform CV2 inpainting using the fallback method
     print("🎨 Performing CV2 inpainting...")
     inpainted = perform_cv2_inpainting(app, image_rgb, dilated_mask)
-    
-    # Blend with original using mask
     print("🎨 Blending images...")
-    final_result = ImageProcessingService.blend_images(
-        image_rgb, inpainted, dilated_mask
-    )
-    # Build preview for processed image
+    final_result = ImageProcessingService.blend_images(image_rgb, inpainted, dilated_mask)
     app.preview_processed_image = app.build_preview_image(final_result)
-    
     print("🎨 Dust removal process completed!")
     return final_result
 

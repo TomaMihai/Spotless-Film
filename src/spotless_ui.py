@@ -98,7 +98,22 @@ def create_import_section(self, parent):
     self.batch_threshold_slider.pack(fill="x", pady=(5, 0))
 
 def create_removal_section(self, parent):
-    self.remove_btn = ctk.CTkButton(parent, text="?? Remove Dust", command=self.remove_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
+    # Checkbox to control scratch/lint removal
+    self.remove_scratches_var = ctk.BooleanVar(value=getattr(self.state, 'remove_scratches', True))
+    def on_remove_scratches_toggled():
+        self.state.remove_scratches = bool(self.remove_scratches_var.get())
+        # Rebuild dust mask if prediction already exists
+        if self.state.raw_prediction_mask is not None:
+            from state_and_model_management import update_dust_mask_with_threshold
+            update_dust_mask_with_threshold(self)
+    self.remove_scratches_chk = ctk.CTkCheckBox(
+        parent,
+        text="Remove scratches / lint",
+        variable=self.remove_scratches_var,
+        command=on_remove_scratches_toggled
+    )
+    self.remove_scratches_chk.pack(anchor="w", pady=(0, 8))
+    self.remove_btn = ctk.CTkButton(parent, text="🧹 Remove Dust", command=self.remove_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
     self.remove_btn.pack(fill="x", pady=(0, 10))
     self.processing_time_frame = ctk.CTkFrame(parent, fg_color="transparent")
     self.processing_time_frame.pack(fill="x")

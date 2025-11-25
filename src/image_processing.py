@@ -141,6 +141,38 @@ class ImageProcessingService:
     """Service for handling image processing operations"""
     
     @staticmethod
+    def keep_small_dust_only(mask: Image.Image, size_factor: float = 0.0003, max_axis_factor: float = 0.012) -> Image.Image:
+        """Filter a binary mask to keep only small, compact dust specks.
+        Removes large or elongated components (scratches, lint hairs).
+        size_factor: max area as fraction of total pixels.
+        max_axis_factor: max bounding box major axis as fraction of min(image dimension).
+        """
+        import cv2
+        mask_np = np.array(mask.convert('L'))
+        h, w = mask_np.shape
+        total_px = w * h
+        max_area_px = max(64, int(total_px * size_factor))
+        max_axis_len = max(10, int(min(w, h) * max_axis_factor))
+        # Ensure binary
+        _, bin_img = cv2.threshold(mask_np, 127, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(bin_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        keep = np.zeros_like(bin_img)
+        kept, removed = 0, 0
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            x, y, cw, ch = cv2.boundingRect(cnt)
+            major_axis = max(cw, ch)
+            # Simple elongation heuristic: if one side > 3x the other and large, treat as scratch
+            elongation = max(cw, ch) / max(1, min(cw, ch))
+            if area <= max_area_px and major_axis <= max_axis_len and elongation < 3.5:
+                cv2.drawContours(keep, [cnt], -1, 255, thickness=cv2.FILLED)
+                kept += 1
+            else:
+                removed += 1
+        print(f"🧹 keep_small_dust_only: kept={kept}, removed={removed}, max_area={max_area_px}, max_axis={max_axis_len}")
+        return Image.fromarray(keep, mode='L')
+    
+    @staticmethod
     def load_model(weights_path: str, device: torch.device) -> UNet:
         """Load U-Net model from weights file (exact match to main.ipynb architecture)"""
         try:

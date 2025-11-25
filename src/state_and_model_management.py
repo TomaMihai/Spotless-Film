@@ -114,6 +114,9 @@ def update_dust_mask_with_threshold(app):
         app.state.processing_state.threshold,
         app.state.selected_image.size
     )
+    # If user disabled scratch/lint removal, filter to keep only small dust specks
+    if new_mask and not getattr(app.state, 'remove_scratches', True):
+        new_mask = ImageProcessingService.keep_small_dust_only(new_mask)
     
     app.state.dust_mask = new_mask
     app.state.create_low_res_mask()
@@ -134,10 +137,12 @@ def update_dust_mask_with_threshold_realtime(app):
     )
     
     if new_mask:
+        if not getattr(app.state, 'remove_scratches', True):
+            new_mask = ImageProcessingService.keep_small_dust_only(new_mask)
         app.state.dust_mask = new_mask
         app.state.create_low_res_mask()
         
         # Immediately update the display
         app.update_ui()
         
-        print(f"✅ Mask updated with threshold {app.state.processing_state.threshold:.3f}")
+        print(f"✅ Mask updated with threshold {app.state.processing_state.threshold:.3f} (filtered small dust only={not getattr(app.state,'remove_scratches', True)})")
