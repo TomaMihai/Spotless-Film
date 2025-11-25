@@ -154,12 +154,15 @@ def batch_process_folder_dialog(self):
     progress_window = BatchProgressWindow(self.root)
     self.root.attributes('-alpha', 1.0) # Force main window to be opaque
     progress_window.lift() # Bring the batch window to the front
-    
-    t = threading.Thread(target=self._batch_process_folder_worker, args=(folder, progress_window, progress_window.stop_event))
+
+    # Pass the batch threshold from state to the worker
+    batch_threshold = getattr(self.state, 'batch_threshold', 0.005)
+    print(f"[SpotlessBatch] Starting batch process with sensitivity {batch_threshold}")
+    t = threading.Thread(target=self._batch_process_folder_worker, args=(folder, progress_window, progress_window.stop_event, batch_threshold))
     t.daemon = True
     t.start()
 
-def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_event: threading.Event):
+def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_event: threading.Event, batch_threshold: float):
     try:
         # Ensure model is available
         if not self.state.unet_model:
@@ -167,6 +170,8 @@ def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_e
             self._show_messagebox_async('error', 'Batch Error', 'U-Net model not loaded. Please wait for models to load.')
             self.root.after_idle(lambda: progress_window.destroy())
             return
+
+        print(f"Started batch with sensitivity {batch_threshold}")
 
         supported_ext = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")
         all_files: List[str] = []
@@ -209,8 +214,7 @@ def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_e
         processed_count = 0
         failed_count = 0
         start_time = time.time()
-        batch_threshold = 0.075  # fixed sensitivity per request
-        
+        # batch_threshold is now passed in
         first_file_end_time = None
         
         batch_cancelled = False

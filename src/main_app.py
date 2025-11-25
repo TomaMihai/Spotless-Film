@@ -270,8 +270,11 @@ class SpotlessFilmModern:
         spotless_batch._finish_batch_ui(self, progress_window)
     def batch_process_folder_dialog(self):
         spotless_batch.batch_process_folder_dialog(self)
-    def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_event: threading.Event):
-        spotless_batch._batch_process_folder_worker(self, root_folder, progress_window, stop_event)
+    def _batch_process_folder_worker(self, root_folder: str, progress_window, stop_event: threading.Event, batch_threshold: float):
+        spotless_batch._batch_process_folder_worker(self, root_folder, progress_window, stop_event, batch_threshold)
+    def on_batch_threshold_changed(self, value):
+        self.batch_threshold_value_label.configure(text=f"{float(value):.4f}")
+        self.state.batch_threshold = float(value)
 
     def run(self):
         """Run the application"""

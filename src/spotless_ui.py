@@ -22,7 +22,7 @@ def setup_ui(self):
     self.state.add_observer(self.update_ui)
 
 def setup_modern_sidebar(self):
-    self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=280, corner_radius=0, fg_color="#2A2A2A")
+    self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=360, corner_radius=0, fg_color="#2A2A2A")
     self.sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 1))
     self.sidebar_frame.grid_rowconfigure(4, weight=1)
     self.sidebar_frame.grid_propagate(False)
@@ -75,6 +75,37 @@ def create_import_section(self, parent):
     self.import_btn.pack(fill="x", pady=(0, 5))
     self.batch_btn = ctk.CTkButton(parent, text="📂 Batch Process Folder", command=self.batch_process_folder_dialog, font=ctk.CTkFont(size=12), height=32, fg_color="#4A4A4A", hover_color="#5A5A5A")
     self.batch_btn.pack(fill="x", pady=(0, 5))
+    # --- Batch Sensitivity Slider ---
+    batch_sens_frame = ctk.CTkFrame(parent, fg_color="transparent")
+    batch_sens_frame.pack(fill="x", pady=(0, 5))
+    header_row = ctk.CTkFrame(batch_sens_frame, fg_color="transparent")
+    header_row.pack(fill="x")
+    batch_sens_label = ctk.CTkLabel(header_row, text="Batch Sensitivity", font=ctk.CTkFont(size=11, weight="bold"))
+    batch_sens_label.pack(side="left")
+    self.batch_threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state, 'batch_threshold', 0.2):.4f}", font=ctk.CTkFont(size=10), text_color="#CCCCCC")
+    self.batch_threshold_value_label.pack(side="right")
+    slider_frame = ctk.CTkFrame(batch_sens_frame, fg_color="transparent")
+    slider_frame.pack(fill="x")
+    less_label = ctk.CTkLabel(slider_frame, text="More Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
+    less_label.pack(side="left")
+    more_label = ctk.CTkLabel(slider_frame, text="Less Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
+    more_label.pack(side="right")
+    self.batch_threshold_slider = ctk.CTkSlider(
+        slider_frame, from_=0.0001, to=0.2, number_of_steps=200,
+        command=self.on_batch_threshold_changed
+    )
+    self.batch_threshold_slider.set(getattr(self.state, 'batch_threshold', 0.0750))
+    self.batch_threshold_slider.pack(fill="x", pady=(5, 0))
+
+def create_removal_section(self, parent):
+    self.remove_btn = ctk.CTkButton(parent, text="?? Remove Dust", command=self.remove_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
+    self.remove_btn.pack(fill="x", pady=(0, 10))
+    self.processing_time_frame = ctk.CTkFrame(parent, fg_color="transparent")
+    self.processing_time_frame.pack(fill="x")
+    time_title = ctk.CTkLabel(self.processing_time_frame, text="Processing Time:", font=ctk.CTkFont(size=10), text_color="#888888")
+    time_title.pack(anchor="w")
+    self.processing_time_label = ctk.CTkLabel(self.processing_time_frame, text="0.00s", font=ctk.CTkFont(size=12), text_color="#CCCCCC")
+    self.processing_time_label.pack(anchor="w")
 
 def create_detection_section(self, parent):
     self.detect_btn = ctk.CTkButton(parent, text="🔍 Detect Dust", command=self.detect_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
@@ -85,7 +116,7 @@ def create_detection_section(self, parent):
     header_row.pack(fill="x")
     sensitivity_label = ctk.CTkLabel(header_row, text="🎯 Sensitivity", font=ctk.CTkFont(size=12, weight="bold"))
     sensitivity_label.pack(side="left")
-    self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{self.state.processing_state.threshold:.4f}", font=ctk.CTkFont(size=11), text_color="#CCCCCC")
+    self.threshold_value_label = ctk.CTkLabel(header_row, text=f"{getattr(self.state.processing_state, 'threshold', 0.0750):.4f}", font=ctk.CTkFont(size=11), text_color="#CCCCCC")
     self.threshold_value_label.pack(side="right")
     slider_frame = ctk.CTkFrame(self.threshold_frame, fg_color="transparent")
     slider_frame.pack(fill="x", pady=(0, 5))
@@ -94,22 +125,13 @@ def create_detection_section(self, parent):
     less_label = ctk.CTkLabel(labels_frame, text="More Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
     less_label.pack(side="left")
     more_label = ctk.CTkLabel(labels_frame, text="Less Sensitive", font=ctk.CTkFont(size=9), text_color="#888888")
-    more_label.pack(side="right")
-    self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.0001, to=0.075, command=self.on_threshold_changed, number_of_steps=200)
-    self.threshold_slider.set(float(self.state.processing_state.threshold))
+    more_label.pack(side="right")    
+    self.threshold_slider = ctk.CTkSlider(slider_frame, from_=0.0001, to=0.2, command=self.on_threshold_changed, number_of_steps=200)
+    self.threshold_slider.set(getattr(self.state.processing_state, 'threshold', 0.0750))
+    self.threshold_slider.set(getattr(self.state, 'threshold', 0.0750))
     self.threshold_slider.pack(fill="x", pady=(5, 0))
     help_label = ctk.CTkLabel(self.threshold_frame, text="Lower values detect only strongest dust; raise for more.", font=ctk.CTkFont(size=9), text_color="#666666")
     help_label.pack(anchor="w", pady=(5, 0))
-
-def create_removal_section(self, parent):
-    self.remove_btn = ctk.CTkButton(parent, text="🧹 Remove Dust", command=self.remove_dust, font=ctk.CTkFont(size=12), height=32, state="disabled", fg_color="#4A4A4A", hover_color="#5A5A5A")
-    self.remove_btn.pack(fill="x", pady=(0, 10))
-    self.processing_time_frame = ctk.CTkFrame(parent, fg_color="transparent")
-    self.processing_time_frame.pack(fill="x")
-    time_title = ctk.CTkLabel(self.processing_time_frame, text="Processing Time:", font=ctk.CTkFont(size=10), text_color="#888888")
-    time_title.pack(anchor="w")
-    self.processing_time_label = ctk.CTkLabel(self.processing_time_frame, text="0.00s", font=ctk.CTkFont(size=12), text_color="#CCCCCC")
-    self.processing_time_label.pack(anchor="w")
 
 # --- Brush Cursor Methods ---
 def on_mouse_motion(self, event):
@@ -208,3 +230,7 @@ def update_cursor_for_tool_change(self):
             except:
                 pass
             self.hide_brush_cursor()
+
+def on_batch_threshold_changed(self, value):
+    self.batch_threshold_value_label.configure(text=f"{float(value):.4f}")
+    self.state.batch_threshold = float(value)
