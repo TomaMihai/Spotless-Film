@@ -160,8 +160,7 @@ def display_split_view(app, canvas_width, canvas_height):
     if not app.state.selected_image:
         return
     
-    print("🖼️ Rendering split view")
-    
+            # print("🖼️ Rendering split view")    
     # If no processed image, show single view
     if not app.state.processed_image:
         display_single_view(app, canvas_width, canvas_height)

@@ -97,8 +97,11 @@ class BatchProgressWindow(ctk.CTkToplevel):
         self.update_idletasks()
 
     def _on_closing(self):
-        self.stop_event.set() # Signal the batch process to stop
-        self.destroy()
+        """Handle window close button click."""
+        print("Batch cancel requested, signaling worker thread...")
+        self.status_label.configure(text="Cancelling...")
+        self.stop_event.set()
+        self.withdraw() # Hide the window immediately
 
 def _show_messagebox_async(self, kind: str, title: str, msg: str):
     def _do():
@@ -149,6 +152,7 @@ def batch_process_folder_dialog(self):
         pass
     
     progress_window = BatchProgressWindow(self.root)
+    self.root.attributes('-alpha', 1.0) # Force main window to be opaque
     
     t = threading.Thread(target=self._batch_process_folder_worker, args=(folder, progress_window, progress_window.stop_event))
     t.daemon = True

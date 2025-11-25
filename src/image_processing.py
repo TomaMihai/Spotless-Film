@@ -70,6 +70,9 @@ try:
     from lama_cleaner.schema import Config
     LAMA_AVAILABLE = True
 except ImportError:
+    import traceback
+    print("❌ LaMa Cleaner not found. Please install it with 'pip install lama-cleaner'")
+    traceback.print_exc()
     LAMA_AVAILABLE = False
 
 
@@ -101,12 +104,15 @@ class LamaInpainter:
                 self.available = True
                 print("✅ LaMa inpainting model loaded successfully")
             except Exception as e:
-                print(f"Failed to load LaMa: {e}")
+                import traceback
+                print(f"❌ Failed to load LaMa model: {e}")
+                traceback.print_exc()
                 self.available = False
     
     def inpaint(self, image: Image.Image, mask: Image.Image) -> Image.Image:
         """Inpaint using LaMa or fallback to advanced CV2"""
         if not self.available:
+            print("🎨 LaMa not available, falling back to CV2 inpainting...")
             return self._fallback_inpaint(image, mask)
         
         try:
@@ -118,7 +124,9 @@ class LamaInpainter:
             return Image.fromarray(result)
             
         except Exception as e:
-            print(f"LaMa failed: {e}, falling back to CV2")
+            import traceback
+            print(f"❌ LaMa inpainting failed: {e}, falling back to CV2")
+            traceback.print_exc()
             return self._fallback_inpaint(image, mask)
     
     def _fallback_inpaint(self, image: Image.Image, mask: Image.Image) -> Image.Image:
